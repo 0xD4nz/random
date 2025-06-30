@@ -1,9 +1,12 @@
-name: Build FFmpeg Windows (x264 + x265 Static)
+name: Build & Release FFmpeg Windows (Static x264 + x265)
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-ffmpeg:
@@ -29,6 +32,7 @@ jobs:
             mingw-w64-x86_64-pkg-config
             unzip
             wget
+            p7zip  # untuk 7z
 
       - name: Build x264 static
         shell: msys2 {0}
@@ -53,6 +57,7 @@ jobs:
           cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64 -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../source
           make -j$(nproc)
           make install
+          ls -lh /mingw64/lib/pkgconfig/x265.pc  # debug: cek file .pc
 
       - name: Build FFmpeg static with x264 x265
         shell: msys2 {0}
@@ -69,15 +74,29 @@ jobs:
             --disable-shared \
             --disable-debug \
             --extra-cflags="-I/mingw64/include" \
-            --extra-ldflags="-L/mingw64/lib" \
-            --extra-libs=-lpthread
+            --extra-ldflags="-L/mingw64/lib"
           make -j$(nproc)
           make install
 
-      - name: Upload FFmpeg binary
-        uses: actions/upload-artifact@v4
+      - name: List ffmpeg binary
+        run: dir msys64\mingw64\bin
+
+      - name: Compress FFmpeg binaries
+        run: 7z a ffmpeg-windows-x64.zip msys64\mingw64\bin\ffmpeg.exe msys64\mingw64\bin\ffprobe.exe
+
+      - name: Create/Update Release (nightly-main)
+        uses: ncipollo/release-action@v1
         with:
-          name: ffmpeg-windows-x64
-          path: |
-            /c/msys64/mingw64/bin/ffmpeg.exe
-            /c/msys64/mingw64/bin/ffprobe.exe
+          tag: nightly-main
+          name: Nightly Main
+          body: "Automated static build (Windows, x264+x265) from latest push to main branch."
+          allowUpdates: true
+          prerelease: true
+
+      - name: Upload FFmpeg to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ffmpeg-windows-x64.zip
+          tag_name: nightly-main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
