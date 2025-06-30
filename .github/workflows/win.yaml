@@ -1,81 +1,75 @@
-name: Build FFmpeg Static with x265 4.1 (Windows, patched)
+name: Build FFmpeg Windows (x264 + x265 Static)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
-  build-ffmpeg-x265-windows:
+  build-ffmpeg:
     runs-on: windows-latest
 
-    defaults:
-      run:
-        shell: msys2 {0}
-
     steps:
-      - name: Install MSYS2 & dependencies
+      - name: Checkout FFmpeg source
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          path: ffmpeg
+
+      - name: Install MSYS2 and tools
         uses: msys2/setup-msys2@v2
         with:
           update: true
           install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
             git
             make
-            cmake
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-yasm
-            mingw-w64-x86_64-nasm
+            nasm
             mingw-w64-x86_64-cmake
-            base-devel
-            wget
-            sed
+            mingw-w64-x86_64-pkg-config
 
-      - name: Download & patch x265 v4.1 for CMake 4.x
+      - name: Build x264 static
+        shell: msys2 {0}
         run: |
-          mkdir -p /c/build && cd /c/build
-          wget https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz -O x265-4.1.tar.gz
-          tar xzf x265-4.1.tar.gz
-          mv x265_4.1 x265
-          # Patch CMakeLists.txt to be compatible with CMake >= 3.5
-          sed -i 's/cmake_policy(SET CMP0025 OLD)/#cmake_policy(SET CMP0025 OLD)/' x265/CMakeLists.txt
-          sed -i 's/cmake_policy(SET CMP0054 OLD)/#cmake_policy(SET CMP0054 OLD)/' x265/CMakeLists.txt
-          sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.5)/' x265/CMakeLists.txt
-
-      - name: Build x265 v4.1 (static, patched)
-        run: |
-          cd /c/build/x265
-          mkdir build_x265
-          cd build_x265
-          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/c/ffmpeg-build -DENABLE_SHARED=off ../source
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git
+          cd x264
+          ./configure --prefix=/mingw64 --host=x86_64-w64-mingw32 --enable-static --disable-opencl --disable-cli
           make -j$(nproc)
           make install
 
-      - name: Build latest FFmpeg (static)
+      - name: Build x265 static
+        shell: msys2 {0}
         run: |
-          cd /c/build
-          git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+          git clone --depth 1 https://github.com/videolan/x265.git
+          cd x265/build/msys2
+          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64 -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../source
+          make -j$(nproc)
+          make install
+
+      - name: Build FFmpeg static with x264 x265
+        shell: msys2 {0}
+        run: |
           cd ffmpeg
-          export PKG_CONFIG_PATH="/c/ffmpeg-build/lib/pkgconfig"
           ./configure \
-            --prefix="/c/ffmpeg-build" \
-            --pkg-config-flags="--static" \
-            --extra-cflags="-I/c/ffmpeg-build/include" \
-            --extra-ldflags="-L/c/ffmpeg-build/lib -static" \
-            --extra-libs="-lpthread -lm" \
+            --toolchain=msvc \
+            --prefix=/mingw64 \
+            --pkg-config=pkg-config \
             --enable-gpl \
+            --enable-libx264 \
             --enable-libx265 \
             --enable-static \
             --disable-shared \
             --disable-debug \
-            --disable-doc \
-            --disable-ffplay \
-            --toolchain=msys2.mingw64 \
-            --target-os=mingw32 \
-            --arch=x86_64
+            --extra-cflags="-I/mingw64/include" \
+            --extra-ldflags="-L/mingw64/lib"
           make -j$(nproc)
           make install
 
-      - name: Upload ffmpeg.exe (artifact)
+      - name: Upload FFmpeg binary
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-static-x265-4.1-windows
-          path: C:\ffmpeg-build\bin\ffmpeg.exe
+          name: ffmpeg-windows-x64
+          path: |
+            /c/msys64/mingw64/bin/ffmpeg.exe
+            /c/msys64/mingw64/bin/ffprobe.exe
