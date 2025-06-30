@@ -14,15 +14,6 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Setup Dependencies
-        shell: powershell
-        run: |
-          winget install -e --id NASM.NASM
-          winget install -e --id Yasm.Yasm
-          winget install -e --id Kitware.CMake
-          winget install -e --id GNU.Make
-          winget install -e --id MinGW.MinGW
-
       - name: Build x265
         shell: powershell
         run: |
