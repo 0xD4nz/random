@@ -10,56 +10,55 @@ jobs:
     env:
       FFmpeg_VERSION: "6.1.1"
       X265_VERSION: "3.5"
-      INSTALL_PREFIX: "C:/ffmpeg-build"
+      INSTALL_PREFIX: "/c/ffmpeg-build"  # MSYS2 path style
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Prepare MSYS2 and Mingw-w64 Environment
+    - name: Install dependencies (MSYS2)
+      shell: msys2 {0}
       run: |
-        choco install msys2 -y
-        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
-        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --needed --noconfirm mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake git yasm pkg-config wget"
+        pacman -Sy --noconfirm
+        pacman -S --noconfirm mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake git yasm pkgconf wget
 
-    - name: Build x265 (mingw-w64)
+    - name: Build x265
+      shell: msys2 {0}
       run: |
-        C:\tools\msys64\usr\bin\bash.exe -lc "
-          mkdir -p /c/build && cd /c/build && \
-          git clone --branch ${X265_VERSION} --depth 1 https://github.com/videolan/x265.git && \
-          cd x265/build/mingw64 && \
-          cmake -G 'MSYS Makefiles' -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DENABLE_SHARED=off ../../source && \
-          make -j$(nproc) && \
-          make install
-        "
+        mkdir -p /c/build
+        cd /c/build
+        git clone --branch 3.5 --depth 1 https://github.com/videolan/x265.git
+        cd x265/build/mingw64
+        cmake -G 'MSYS Makefiles' -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DENABLE_SHARED=off ../../source
+        make -j$(nproc)
+        make install
 
-    - name: Build FFmpeg (mingw-w64)
+    - name: Build FFmpeg
+      shell: msys2 {0}
       run: |
-        C:\tools\msys64\usr\bin\bash.exe -lc "
-          cd /c/build && \
-          wget https://ffmpeg.org/releases/ffmpeg-${FFmpeg_VERSION}.tar.bz2 && \
-          tar xjf ffmpeg-${FFmpeg_VERSION}.tar.bz2 && \
-          cd ffmpeg-${FFmpeg_VERSION} && \
-          export PKG_CONFIG_PATH=${INSTALL_PREFIX}/lib/pkgconfig && \
-          ./configure \
-            --prefix=${INSTALL_PREFIX} \
-            --pkg-config-flags='--static' \
-            --extra-cflags='-I${INSTALL_PREFIX}/include' \
-            --extra-ldflags='-L${INSTALL_PREFIX}/lib' \
-            --extra-libs='-lpthread -lm' \
-            --enable-gpl \
-            --enable-libx265 \
-            --enable-static \
-            --disable-shared \
-            --disable-debug \
-            --disable-doc \
-            --disable-ffplay \
-            --toolchain=msys2.mingw64 \
-            --target-os=mingw32 \
-            --arch=x86_64 && \
-          make -j$(nproc) && \
-          make install
-        "
+        cd /c/build
+        wget https://ffmpeg.org/releases/ffmpeg-${FFmpeg_VERSION}.tar.bz2
+        tar xjf ffmpeg-${FFmpeg_VERSION}.tar.bz2
+        cd ffmpeg-${FFmpeg_VERSION}
+        export PKG_CONFIG_PATH=${INSTALL_PREFIX}/lib/pkgconfig
+        ./configure \
+          --prefix=${INSTALL_PREFIX} \
+          --pkg-config-flags="--static" \
+          --extra-cflags="-I${INSTALL_PREFIX}/include" \
+          --extra-ldflags="-L${INSTALL_PREFIX}/lib" \
+          --extra-libs="-lpthread -lm" \
+          --enable-gpl \
+          --enable-libx265 \
+          --enable-static \
+          --disable-shared \
+          --disable-debug \
+          --disable-doc \
+          --disable-ffplay \
+          --toolchain=msys2.mingw64 \
+          --target-os=mingw32 \
+          --arch=x86_64
+        make -j$(nproc)
+        make install
 
     - name: Upload ffmpeg.exe (artifact)
       uses: actions/upload-artifact@v4
