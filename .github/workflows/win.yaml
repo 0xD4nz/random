@@ -32,8 +32,10 @@ jobs:
         run: |
           mkdir -p /c/build && cd /c/build
           git clone https://github.com/videolan/x265.git
-          cd x265/build/mingw64
-          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/c/ffmpeg-build -DENABLE_SHARED=off ../../source
+          cd x265
+          mkdir build
+          cd build
+          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/c/ffmpeg-build -DENABLE_SHARED=off ../source
           make -j$(nproc)
           make install
 
