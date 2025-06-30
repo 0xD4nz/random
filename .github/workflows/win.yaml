@@ -14,6 +14,11 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
+      - name: Update PATH for Chocolatey tools
+        shell: powershell
+        run: |
+          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd"
+
       - name: Install Dependencies
         shell: powershell
         run: |
