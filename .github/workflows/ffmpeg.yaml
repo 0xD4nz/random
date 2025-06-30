@@ -1,0 +1,83 @@
+name: FFmpeg Static Build with x265
+
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        type: choice
+        description: Pilih OS build
+        options:
+          - linux
+          - windows
+        required: true
+        default: linux
+
+jobs:
+  build:
+    runs-on: ${{ inputs.os == 'windows' && 'windows-latest' || 'ubuntu-latest' }}
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Dependencies (Linux)
+        if: inputs.os == 'linux'
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential git pkg-config nasm yasm autoconf automake cmake libtool wget
+          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig" >> $GITHUB_ENV
+
+      - name: Setup Dependencies (Windows)
+        if: inputs.os == 'windows'
+        run: |
+          choco install -y nasm yasm cmake make mingw
+
+      - name: Build x265
+        run: |
+          git clone https://bitbucket.org/multicoreware/x265_git.git
+          cd x265_git/build/linux
+          if [ "${{ inputs.os }}" = "linux" ]; then
+            cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_SHARED=OFF ../../source
+            make -j$(nproc)
+            sudo make install
+          else
+            cd ../..
+            mkdir -p build/msys && cd build/msys
+            cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DENABLE_SHARED=OFF ../../source
+            make -j$(nproc)
+            make install
+          fi
+
+      - name: Build FFmpeg
+        run: |
+          git clone https://github.com/FFmpeg/FFmpeg.git
+          cd FFmpeg
+          if [ "${{ inputs.os }}" = "linux" ]; then
+            ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I/usr/local/include" --extra-ldflags="-L/usr/local/lib"
+            make -j$(nproc)
+          else
+            ./configure --toolchain=msvc --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib"
+            make -j$(nproc)
+          fi
+
+      - name: Prepare Release
+        run: |
+          mkdir release
+          if [ "${{ inputs.os }}" = "linux" ]; then
+            cp FFmpeg/ffmpeg release/
+            tar -czvf ffmpeg-linux-x265.tar.gz -C release .
+          else
+            cp FFmpeg/ffmpeg.exe release/
+            7z a ffmpeg-windows-x265.zip ./release/*
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "build-${{ github.run_number }}"
+          files: |
+            ffmpeg-linux-x265.tar.gz
+            ffmpeg-windows-x265.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
