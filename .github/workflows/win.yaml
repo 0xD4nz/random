@@ -26,7 +26,7 @@ jobs:
           $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd"
           git --version
 
-      - name: Build x265
+      - name: Build x265 (clone, cmake, make, install)
         shell: powershell
         run: |
           $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
@@ -39,7 +39,7 @@ jobs:
           mingw32-make -j $cpu
           mingw32-make install
 
-      - name: Build FFmpeg
+      - name: Build FFmpeg (clone, configure, make)
         shell: powershell
         run: |
           $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
