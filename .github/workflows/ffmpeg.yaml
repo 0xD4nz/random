@@ -34,7 +34,7 @@ jobs:
         if: inputs.os == 'windows'
         shell: bash
         run: |
-          choco install -y nasm yasm cmake mingw make
+          choco install -y nasm yasm cmake mingw make mingw-w64
 
       - name: Build x265
         shell: bash
@@ -62,7 +62,7 @@ jobs:
             ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I/usr/local/include" --extra-ldflags="-L/usr/local/lib"
             make -j$(nproc)
           else
-            ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib" --cross-prefix=x86_64-w64-mingw32- --target-os=mingw32 --arch=x86_64
+            ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib" --cross-prefix=x86_64-w64-mingw32- --target-os=mingw32 --arch=x86_64 --disable-x86asm
             mingw32-make -j$(nproc)
           fi
 
