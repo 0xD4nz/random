@@ -57,7 +57,6 @@ jobs:
           cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64 -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../source
           make -j$(nproc)
           make install
-          ls -lh /mingw64/lib/pkgconfig/x265.pc  # debug: cek file .pc
 
       - name: Build FFmpeg static with x264 x265
         shell: msys2 {0}
@@ -78,18 +77,21 @@ jobs:
           make -j$(nproc)
           make install
 
-      - name: List ffmpeg binary (MSYS2 shell)
+      - name: Copy binaries to workspace (for artifact & release)
         shell: msys2 {0}
-        run: ls -lh /mingw64/bin
+        run: |
+          mkdir -p /__w/_temp/artifacts
+          cp /mingw64/bin/ffmpeg.exe /__w/_temp/artifacts/
+          cp /mingw64/bin/ffprobe.exe /__w/_temp/artifacts/
 
-      - name: List ffmpeg binary (Windows shell)
-        run: dir msys64\mingw64\bin
+      - name: Archive FFmpeg binaries
+        run: 7z a ffmpeg-windows-x64.zip _temp/artifacts/ffmpeg.exe _temp/artifacts/ffprobe.exe
 
-      - name: Compress FFmpeg binaries
-        run: 7z a ffmpeg-windows-x64.zip msys64\mingw64\bin\ffmpeg.exe msys64\mingw64\bin\ffprobe.exe
-
-      - name: List zip file
-        run: dir ffmpeg-windows-x64.zip
+      - name: Upload build as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-x64
+          path: ffmpeg-windows-x64.zip
 
       - name: Create/Update Release (nightly-main)
         uses: ncipollo/release-action@v1
