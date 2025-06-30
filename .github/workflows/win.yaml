@@ -87,8 +87,18 @@ jobs:
       - name: List artifacts (Windows)
         run: dir artifacts
 
-      - name: Archive FFmpeg binaries
-        run: 7z a ffmpeg-windows-x64.zip artifacts/ffmpeg.exe artifacts/ffprobe.exe
+      - name: Archive FFmpeg binaries (flat)
+        run: |
+          cd artifacts
+          7z a ../ffmpeg-windows-x64.zip ffmpeg.exe ffprobe.exe
+
+      - name: Remove raw binaries after zip
+        run: |
+          del artifacts\ffmpeg.exe
+          del artifacts\ffprobe.exe
+
+      - name: List artifacts after cleanup
+        run: dir artifacts
 
       - name: Upload build as artifact
         uses: actions/upload-artifact@v4
@@ -96,7 +106,7 @@ jobs:
           name: ffmpeg-windows-x64
           path: ffmpeg-windows-x64.zip
 
-      - name: Create/Update Release (nightly-main)
+      - name: Create/Update Release and Upload FFmpeg
         uses: ncipollo/release-action@v1
         with:
           tag: nightly-main
@@ -104,11 +114,4 @@ jobs:
           body: "Automated static build (Windows, x264+x265) from latest push to main branch."
           allowUpdates: true
           prerelease: true
-
-      - name: Upload FFmpeg to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ffmpeg-windows-x64.zip
-          tag_name: nightly-main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ffmpeg-windows-x64.zip
