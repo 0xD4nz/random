@@ -16,7 +16,7 @@ jobs:
           repository: FFmpeg/FFmpeg
           path: ffmpeg
 
-      - name: Install MSYS2 and tools
+      - name: Install MSYS2 and base tools
         uses: msys2/setup-msys2@v2
         with:
           update: true
@@ -26,8 +26,9 @@ jobs:
             git
             make
             nasm
-            mingw-w64-x86_64-cmake
             mingw-w64-x86_64-pkg-config
+            unzip
+            wget
 
       - name: Build x264 static
         shell: msys2 {0}
@@ -38,9 +39,12 @@ jobs:
           make -j$(nproc)
           make install
 
-      - name: Build x265 static
+      - name: Build x265 static (with CMake 3.28.3)
         shell: msys2 {0}
         run: |
+          wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
+          unzip cmake-3.28.3-windows-x86_64.zip -d /tmp/cmake3
+          export PATH="/tmp/cmake3/cmake-3.28.3-windows-x86_64/bin:$PATH"
           git clone --depth 1 https://github.com/videolan/x265.git
           cd x265
           rm -rf build
