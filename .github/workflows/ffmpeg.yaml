@@ -34,7 +34,7 @@ jobs:
         if: inputs.os == 'windows'
         shell: bash
         run: |
-          choco install -y nasm yasm cmake mingw make mingw-w64
+          choco install -y nasm yasm cmake mingw make
 
       - name: Build x265
         shell: bash
