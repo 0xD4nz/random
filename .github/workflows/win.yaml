@@ -1,0 +1,54 @@
+name: FFmpeg Windows Static Build with x265
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Dependencies
+        shell: bash
+        run: |
+          choco install -y nasm yasm cmake mingw make
+
+      - name: Build x265
+        shell: bash
+        run: |
+          git clone https://bitbucket.org/multicoreware/x265_git.git
+          cd x265_git
+          mkdir -p build/msys && cd build/msys
+          cmake -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DENABLE_SHARED=OFF ../../source
+          mingw32-make -j$(nproc)
+          mingw32-make install
+
+      - name: Build FFmpeg
+        shell: bash
+        run: |
+          git clone https://github.com/FFmpeg/FFmpeg.git
+          cd FFmpeg
+          ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib" --target-os=mingw32 --arch=x86_64 --disable-x86asm
+          mingw32-make -j$(nproc)
+
+      - name: Prepare Release
+        shell: bash
+        run: |
+          mkdir release
+          cp FFmpeg/ffmpeg.exe release/
+          7z a ffmpeg-windows-x265.zip ./release/*
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "build-${{ github.run_number }}"
+          files: |
+            ffmpeg-windows-x265.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
