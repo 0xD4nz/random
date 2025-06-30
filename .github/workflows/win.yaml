@@ -17,7 +17,7 @@ jobs:
       - name: Install Dependencies
         shell: powershell
         run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd"
+          $env:Path += ";C:\ProgramData\chocolatey\bin"
           choco install -y git nasm yasm cmake mingw make
 
       - name: Check Git Availability
@@ -29,7 +29,7 @@ jobs:
       - name: Build x265
         shell: powershell
         run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd"
+          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
           git clone https://bitbucket.org/multicoreware/x265_git.git
           cd x265_git
           mkdir -Force build\msys
@@ -42,10 +42,16 @@ jobs:
       - name: Build FFmpeg
         shell: powershell
         run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd"
+          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
           git clone https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
           .\configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I..\x265_git\build\msys\install\include" --extra-ldflags="-L..\x265_git\build\msys\install\lib" --target-os=mingw32 --arch=x86_64 --disable-x86asm
+          echo LastExitCode: $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '==== CONFIGURE ERROR (truncated log) ===='
+            Get-Content config.log -ErrorAction SilentlyContinue | Select-Object -First 40
+            exit $LASTEXITCODE
+          }
           $cpu = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
           mingw32-make -j $cpu
 
