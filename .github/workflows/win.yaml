@@ -57,6 +57,7 @@ jobs:
       - name: Build FFmpeg static with x264 x265
         shell: msys2 {0}
         run: |
+          export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig
           cd ffmpeg
           ./configure \
             --prefix=/mingw64 \
