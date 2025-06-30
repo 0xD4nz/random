@@ -31,8 +31,8 @@ jobs:
       - name: Download & build x265 v3.5 (static)
         run: |
           mkdir -p /c/build && cd /c/build
-          wget https://bitbucket.org/multicoreware/x265_git/get/3.5.tar.gz -O x265-3.5.tar.gz
-          tar xzf x265-3.5.tar.gz
+          wget https://bitbucket.org/multicoreware/x265_git/get/4.1.tar.gz -O x265-4.1.tar.gz
+          tar xzf x265-4.1.tar.gz
           mv multicoreware-x265_git-* x265
           cd x265
           mkdir build_x265
