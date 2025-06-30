@@ -1,4 +1,4 @@
-name: Build FFmpeg Static with x265 4.1 (Windows)
+name: Build FFmpeg Static with x265 4.1 (Windows, patched)
 
 on:
   workflow_dispatch:
@@ -27,14 +27,22 @@ jobs:
             mingw-w64-x86_64-cmake
             base-devel
             wget
+            sed
 
-      - name: Download & build x265 v4.1 (static)
+      - name: Download & patch x265 v4.1 for CMake 4.x
         run: |
           mkdir -p /c/build && cd /c/build
           wget https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz -O x265-4.1.tar.gz
           tar xzf x265-4.1.tar.gz
           mv x265_4.1 x265
-          cd x265
+          # Patch CMakeLists.txt to be compatible with CMake >= 3.5
+          sed -i 's/cmake_policy(SET CMP0025 OLD)/#cmake_policy(SET CMP0025 OLD)/' x265/CMakeLists.txt
+          sed -i 's/cmake_policy(SET CMP0054 OLD)/#cmake_policy(SET CMP0054 OLD)/' x265/CMakeLists.txt
+          sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.5)/' x265/CMakeLists.txt
+
+      - name: Build x265 v4.1 (static, patched)
+        run: |
+          cd /c/build/x265
           mkdir build_x265
           cd build_x265
           cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/c/ffmpeg-build -DENABLE_SHARED=off ../source
