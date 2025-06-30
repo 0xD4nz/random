@@ -33,8 +33,8 @@ jobs:
           mkdir -p /c/build && cd /c/build
           git clone https://github.com/videolan/x265.git
           cd x265
-          mkdir build
-          cd build
+          mkdir build_x265
+          cd build_x265
           cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/c/ffmpeg-build -DENABLE_SHARED=off ../source
           make -j$(nproc)
           make install
