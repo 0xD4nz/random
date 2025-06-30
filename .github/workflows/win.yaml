@@ -59,7 +59,6 @@ jobs:
         run: |
           cd ffmpeg
           ./configure \
-            --toolchain=msvc \
             --prefix=/mingw64 \
             --pkg-config=pkg-config \
             --enable-gpl \
