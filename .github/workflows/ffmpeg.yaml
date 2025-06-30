@@ -12,6 +12,9 @@ on:
         required: true
         default: linux
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ${{ inputs.os == 'windows' && 'windows-latest' || 'ubuntu-latest' }}
@@ -33,15 +36,16 @@ jobs:
           choco install -y nasm yasm cmake make mingw
 
       - name: Build x265
+        shell: bash
         run: |
           git clone https://bitbucket.org/multicoreware/x265_git.git
-          cd x265_git/build/linux
-          if [ "${{ inputs.os }}" = "linux" ]; then
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
+            cd x265_git/build/linux
             cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_SHARED=OFF ../../source
             make -j$(nproc)
             sudo make install
           else
-            cd ../..
+            cd x265_git
             mkdir -p build/msys && cd build/msys
             cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DENABLE_SHARED=OFF ../../source
             make -j$(nproc)
@@ -49,10 +53,11 @@ jobs:
           fi
 
       - name: Build FFmpeg
+        shell: bash
         run: |
           git clone https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
-          if [ "${{ inputs.os }}" = "linux" ]; then
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
             ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I/usr/local/include" --extra-ldflags="-L/usr/local/lib"
             make -j$(nproc)
           else
@@ -61,9 +66,10 @@ jobs:
           fi
 
       - name: Prepare Release
+        shell: bash
         run: |
           mkdir release
-          if [ "${{ inputs.os }}" = "linux" ]; then
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
             cp FFmpeg/ffmpeg release/
             tar -czvf ffmpeg-linux-x265.tar.gz -C release .
           else
@@ -80,4 +86,3 @@ jobs:
             ffmpeg-windows-x265.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
