@@ -79,7 +79,8 @@ jobs:
           make install
 
       - name: List ffmpeg binary
-        run: dir msys64\mingw64\bin
+        shell: msys2 {0}
+        run: ls -l /mingw64/bin
 
       - name: Compress FFmpeg binaries
         run: 7z a ffmpeg-windows-x64.zip msys64\mingw64\bin\ffmpeg.exe msys64\mingw64\bin\ffprobe.exe
