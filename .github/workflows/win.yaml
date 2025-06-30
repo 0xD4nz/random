@@ -84,8 +84,11 @@ jobs:
           cp /mingw64/bin/ffmpeg.exe artifacts/
           cp /mingw64/bin/ffprobe.exe artifacts/
 
+      - name: List artifacts (Windows)
+        run: dir artifacts
+
       - name: Archive FFmpeg binaries
-        run: 7z a ffmpeg-windows-x64.zip _temp/artifacts/ffmpeg.exe _temp/artifacts/ffprobe.exe
+        run: 7z a ffmpeg-windows-x64.zip artifacts/ffmpeg.exe artifacts/ffprobe.exe
 
       - name: Upload build as artifact
         uses: actions/upload-artifact@v4
