@@ -17,7 +17,11 @@ jobs:
       - name: Setup Dependencies
         shell: powershell
         run: |
-          choco install -y nasm yasm cmake mingw make
+          winget install -e --id NASM.NASM
+          winget install -e --id Yasm.Yasm
+          winget install -e --id Kitware.CMake
+          winget install -e --id GNU.Make
+          winget install -e --id MinGW.MinGW
 
       - name: Build x265
         shell: powershell
