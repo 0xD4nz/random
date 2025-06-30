@@ -42,8 +42,10 @@ jobs:
         shell: msys2 {0}
         run: |
           git clone --depth 1 https://github.com/videolan/x265.git
-          cd x265/build/msys2
-          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64 -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../source
+          cd x265
+          mkdir build
+          cd build
+          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64 -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../source
           make -j$(nproc)
           make install
 
