@@ -1,73 +1,68 @@
-name: FFmpeg Windows Static Build with x265
+name: Build FFmpeg Static with x265 (Windows)
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build:
+  build-ffmpeg-x265-win:
     runs-on: self-hosted
 
+    env:
+      FFmpeg_VERSION: "6.1.1"
+      X265_VERSION: "3.5"
+      INSTALL_PREFIX: "C:/ffmpeg-build"
+
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        shell: powershell
-        run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin"
-          choco install -y git nasm yasm cmake mingw make
+    - name: Prepare MSYS2 and Mingw-w64 Environment
+      run: |
+        choco install msys2 -y
+        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
+        C:\tools\msys64\usr\bin\bash.exe -lc "pacman -S --needed --noconfirm mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake git yasm pkg-config wget"
 
-      - name: Check Git Availability
-        shell: powershell
-        run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd"
-          git --version
+    - name: Build x265 (mingw-w64)
+      run: |
+        C:\tools\msys64\usr\bin\bash.exe -lc "
+          mkdir -p /c/build && cd /c/build && \
+          git clone --branch ${X265_VERSION} --depth 1 https://github.com/videolan/x265.git && \
+          cd x265/build/mingw64 && \
+          cmake -G 'MSYS Makefiles' -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DENABLE_SHARED=off ../../source && \
+          make -j$(nproc) && \
+          make install
+        "
 
-      - name: Build x265 (clone, cmake, make, install)
-        shell: powershell
-        run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
-          git clone https://bitbucket.org/multicoreware/x265_git.git
-          cd x265_git
-          mkdir -Force build\msys
-          cd build\msys
-          cmake -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=$(pwd)\install -DENABLE_SHARED=OFF ..\..\source
-          $cpu = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
-          mingw32-make -j $cpu
-          mingw32-make install
+    - name: Build FFmpeg (mingw-w64)
+      run: |
+        C:\tools\msys64\usr\bin\bash.exe -lc "
+          cd /c/build && \
+          wget https://ffmpeg.org/releases/ffmpeg-${FFmpeg_VERSION}.tar.bz2 && \
+          tar xjf ffmpeg-${FFmpeg_VERSION}.tar.bz2 && \
+          cd ffmpeg-${FFmpeg_VERSION} && \
+          export PKG_CONFIG_PATH=${INSTALL_PREFIX}/lib/pkgconfig && \
+          ./configure \
+            --prefix=${INSTALL_PREFIX} \
+            --pkg-config-flags='--static' \
+            --extra-cflags='-I${INSTALL_PREFIX}/include' \
+            --extra-ldflags='-L${INSTALL_PREFIX}/lib' \
+            --extra-libs='-lpthread -lm' \
+            --enable-gpl \
+            --enable-libx265 \
+            --enable-static \
+            --disable-shared \
+            --disable-debug \
+            --disable-doc \
+            --disable-ffplay \
+            --toolchain=msys2.mingw64 \
+            --target-os=mingw32 \
+            --arch=x86_64 && \
+          make -j$(nproc) && \
+          make install
+        "
 
-      - name: Build FFmpeg (clone, configure, make)
-        shell: powershell
-        run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
-          git clone https://github.com/FFmpeg/FFmpeg.git
-          cd FFmpeg
-          .\configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I..\x265_git\build\msys\install\include" --extra-ldflags="-L..\x265_git\build\msys\install\lib" --target-os=mingw32 --arch=x86_64 --disable-x86asm
-          echo LastExitCode: $LASTEXITCODE
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '==== CONFIGURE ERROR (truncated log) ===='
-            Get-Content config.log -ErrorAction SilentlyContinue | Select-Object -First 40
-            exit $LASTEXITCODE
-          }
-          $cpu = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
-          mingw32-make -j $cpu
-
-      - name: Prepare Release
-        shell: powershell
-        run: |
-          $env:Path += ";C:\ProgramData\chocolatey\bin"
-          mkdir release
-          Copy-Item FFmpeg\ffmpeg.exe release\
-          7z a ffmpeg-windows-x265.zip .\release\*
-
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "build-${{ github.run_number }}"
-          files: |
-            ffmpeg-windows-x265.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload ffmpeg.exe (artifact)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ffmpeg-static-x265-windows
+        path: C:/ffmpeg-build/bin/ffmpeg.exe
