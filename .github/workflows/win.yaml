@@ -45,7 +45,7 @@ jobs:
           wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
           unzip cmake-3.28.3-windows-x86_64.zip -d /tmp/cmake3
           export PATH="/tmp/cmake3/cmake-3.28.3-windows-x86_64/bin:$PATH"
-          git clone --depth 1 https://github.com/videolan/x265.git
+          git clone https://github.com/videolan/x265.git
           cd x265
           rm -rf build
           mkdir build
