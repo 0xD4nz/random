@@ -32,8 +32,9 @@ jobs:
 
       - name: Setup Dependencies (Windows)
         if: inputs.os == 'windows'
+        shell: bash
         run: |
-          choco install -y nasm yasm cmake make mingw
+          choco install -y nasm yasm cmake mingw make
 
       - name: Build x265
         shell: bash
@@ -47,9 +48,9 @@ jobs:
           else
             cd x265_git
             mkdir -p build/msys && cd build/msys
-            cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DENABLE_SHARED=OFF ../../source
-            make -j$(nproc)
-            make install
+            cmake -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DENABLE_SHARED=OFF ../../source
+            mingw32-make -j$(nproc)
+            mingw32-make install
           fi
 
       - name: Build FFmpeg
@@ -61,8 +62,8 @@ jobs:
             ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I/usr/local/include" --extra-ldflags="-L/usr/local/lib"
             make -j$(nproc)
           else
-            ./configure --toolchain=msvc --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib"
-            make -j$(nproc)
+            ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib" --cross-prefix=x86_64-w64-mingw32- --target-os=mingw32 --arch=x86_64
+            mingw32-make -j$(nproc)
           fi
 
       - name: Prepare Release
