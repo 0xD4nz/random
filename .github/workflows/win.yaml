@@ -78,12 +78,18 @@ jobs:
           make -j$(nproc)
           make install
 
-      - name: List ffmpeg binary
+      - name: List ffmpeg binary (MSYS2 shell)
         shell: msys2 {0}
-        run: ls -l /mingw64/bin
+        run: ls -lh /mingw64/bin
+
+      - name: List ffmpeg binary (Windows shell)
+        run: dir msys64\mingw64\bin
 
       - name: Compress FFmpeg binaries
         run: 7z a ffmpeg-windows-x64.zip msys64\mingw64\bin\ffmpeg.exe msys64\mingw64\bin\ffprobe.exe
+
+      - name: List zip file
+        run: dir ffmpeg-windows-x64.zip
 
       - name: Create/Update Release (nightly-main)
         uses: ncipollo/release-action@v1
