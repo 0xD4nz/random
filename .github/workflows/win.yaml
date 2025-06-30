@@ -80,9 +80,9 @@ jobs:
       - name: Copy binaries to workspace (for artifact & release)
         shell: msys2 {0}
         run: |
-          mkdir -p /__w/_temp/artifacts
-          cp /mingw64/bin/ffmpeg.exe /__w/_temp/artifacts/
-          cp /mingw64/bin/ffprobe.exe /__w/_temp/artifacts/
+          mkdir -p artifacts
+          cp /mingw64/bin/ffmpeg.exe artifacts/
+          cp /mingw64/bin/ffprobe.exe artifacts/
 
       - name: Archive FFmpeg binaries
         run: 7z a ffmpeg-windows-x64.zip _temp/artifacts/ffmpeg.exe _temp/artifacts/ffprobe.exe
