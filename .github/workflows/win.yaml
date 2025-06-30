@@ -69,7 +69,8 @@ jobs:
             --disable-shared \
             --disable-debug \
             --extra-cflags="-I/mingw64/include" \
-            --extra-ldflags="-L/mingw64/lib"
+            --extra-ldflags="-L/mingw64/lib" \
+            --extra-libs=-lpthread
           make -j$(nproc)
           make install
 
