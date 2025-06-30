@@ -27,7 +27,7 @@ jobs:
         if: inputs.os == 'linux'
         run: |
           sudo apt update
-          sudo apt install -y build-essential git pkg-config nasm yasm autoconf automake cmake libtool wget
+          sudo apt install -y build-essential git pkg-config nasm yasm autoconf automake cmake libtool wget mingw-w64
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Setup Dependencies (Windows)
@@ -35,6 +35,7 @@ jobs:
         shell: bash
         run: |
           choco install -y nasm yasm cmake mingw make
+          choco install -y mingw --version=11.2.0
 
       - name: Build x265
         shell: bash
@@ -62,7 +63,7 @@ jobs:
             ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I/usr/local/include" --extra-ldflags="-L/usr/local/lib"
             make -j$(nproc)
           else
-            ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib" --cross-prefix=x86_64-w64-mingw32- --target-os=mingw32 --arch=x86_64 --disable-x86asm
+            ./configure --enable-gpl --enable-libx265 --enable-static --disable-shared --extra-cflags="-I../x265_git/build/msys/install/include" --extra-ldflags="-L../x265_git/build/msys/install/lib" --target-os=mingw32 --arch=x86_64 --disable-x86asm
             mingw32-make -j$(nproc)
           fi
 
