@@ -61,7 +61,7 @@ jobs:
           cd ffmpeg
           ./configure \
             --prefix=/mingw64 \
-            --pkg-config=pkg-config \
+            --pkg-config="pkg-config --static" \
             --enable-gpl \
             --enable-libx264 \
             --enable-libx265 \
