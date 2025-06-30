@@ -1,4 +1,4 @@
-name: Build FFmpeg Static with Latest x265 (Windows)
+name: Build FFmpeg Static with x265 (Windows)
 
 on:
   workflow_dispatch:
@@ -28,10 +28,12 @@ jobs:
             base-devel
             wget
 
-      - name: Build latest x265 (static)
+      - name: Download & build x265 v3.5 (static)
         run: |
           mkdir -p /c/build && cd /c/build
-          git clone https://github.com/videolan/x265.git
+          wget https://bitbucket.org/multicoreware/x265_git/get/3.5.tar.gz -O x265-3.5.tar.gz
+          tar xzf x265-3.5.tar.gz
+          mv multicoreware-x265_git-* x265
           cd x265
           mkdir build_x265
           cd build_x265
@@ -67,5 +69,5 @@ jobs:
       - name: Upload ffmpeg.exe (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-static-x265-latest-windows
+          name: ffmpeg-static-x265-windows
           path: C:\ffmpeg-build\bin\ffmpeg.exe
