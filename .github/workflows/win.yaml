@@ -14,6 +14,16 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
+      - name: Install Dependencies
+        shell: powershell
+        run: |
+          choco install -y git nasm yasm cmake mingw make
+
+      - name: Check Git Availability
+        shell: powershell
+        run: |
+          git --version
+
       - name: Build x265
         shell: powershell
         run: |
