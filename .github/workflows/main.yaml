@@ -17,31 +17,87 @@ permissions:
   contents: write
 
 jobs:
-  build-ffmpeg:
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, windows-latest]
-        include:
-          - os: ubuntu-22.04
-            label: linux
-          - os: windows-latest
-            label: windows
-    runs-on: ${{ matrix.os }}
-    if: |
-      github.event.inputs.platform == 'all' ||
-      (github.event.inputs.platform == 'linux' && matrix.label == 'linux') ||
-      (github.event.inputs.platform == 'windows' && matrix.label == 'windows')
+  build-linux:
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' }}
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential git pkg-config nasm cmake libtool wget yasm p7zip-full libnuma-dev autoconf automake libssl-dev
 
+      - name: Checkout FFmpeg source
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          path: ffmpeg
+
+      - name: Build x264 static
+        run: |
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git
+          cd x264
+          ./configure --prefix="$GITHUB_WORKSPACE/ffmpeg_build" --enable-static --disable-opencl --disable-cli
+          make -j$(nproc)
+          make install
+
+      - name: Build x265 static
+        run: |
+          git clone https://github.com/videolan/x265.git
+          cd x265/build/linux
+          cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/ffmpeg_build" -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../source
+          make -j$(nproc)
+          make install
+
+      - name: Build FFmpeg static with x264 x265
+        run: |
+          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/ffmpeg_build/lib/pkgconfig"
+          cd ffmpeg
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/ffmpeg_build" \
+            --pkg-config="pkg-config --static" \
+            --extra-cflags="-I$GITHUB_WORKSPACE/ffmpeg_build/include" \
+            --extra-ldflags="-L$GITHUB_WORKSPACE/ffmpeg_build/lib" \
+            --extra-libs="-lpthread -lm" \
+            --bindir="$GITHUB_WORKSPACE/ffmpeg_bin" \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-static \
+            --disable-shared \
+            --disable-debug
+          make -j$(nproc)
+          make install
+
+      - name: Archive FFmpeg binaries (Linux)
+        run: |
+          cd ffmpeg_bin
+          7z a ../ffmpeg-linux-x64.zip ffmpeg ffprobe
+
+      - name: Upload build as artifact (Linux)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-x64
+          path: ffmpeg-linux-x64.zip
+
+      - name: Upload binaries to single Nightly release (Linux)
+        uses: ncipollo/release-action@v1
+        with:
+          tag: nightly
+          name: Nightly
+          body: |
+            Automated static build (Windows & Linux, x264+x265) from workflow_dispatch.
+          allowUpdates: true
+          prerelease: false
+          artifacts: ffmpeg-linux-x64.zip
+
+  build-windows:
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' }}
+    runs-on: windows-latest
+
+    steps:
       - name: Install MSYS2 and base tools (Windows)
-        if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           update: true
@@ -62,18 +118,7 @@ jobs:
           repository: FFmpeg/FFmpeg
           path: ffmpeg
 
-      # === BUILD x264 ===
-      - name: Build x264 static (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          git clone --depth 1 https://code.videolan.org/videolan/x264.git
-          cd x264
-          ./configure --prefix="$GITHUB_WORKSPACE/ffmpeg_build" --enable-static --disable-opencl --disable-cli
-          make -j$(nproc)
-          make install
-
       - name: Build x264 static (Windows)
-        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           git clone --depth 1 https://code.videolan.org/videolan/x264.git
@@ -82,18 +127,7 @@ jobs:
           make -j$(nproc)
           make install
 
-      # === BUILD x265 ===
-      - name: Build x265 static (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          git clone https://github.com/videolan/x265.git
-          cd x265/build/linux
-          cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/ffmpeg_build" -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../source
-          make -j$(nproc)
-          make install
-
       - name: Build x265 static (Windows)
-        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
@@ -108,30 +142,7 @@ jobs:
           make -j$(nproc)
           make install
 
-      # === BUILD FFmpeg ===
-      - name: Build FFmpeg static with x264 x265 (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/ffmpeg_build/lib/pkgconfig"
-          cd ffmpeg
-          ./configure \
-            --prefix="$GITHUB_WORKSPACE/ffmpeg_build" \
-            --pkg-config="pkg-config --static" \
-            --extra-cflags="-I$GITHUB_WORKSPACE/ffmpeg_build/include" \
-            --extra-ldflags="-L$GITHUB_WORKSPACE/ffmpeg_build/lib" \
-            --extra-libs="-lpthread -lm" \
-            --bindir="$GITHUB_WORKSPACE/ffmpeg_bin" \
-            --enable-gpl \
-            --enable-libx264 \
-            --enable-libx265 \
-            --enable-static \
-            --disable-shared \
-            --disable-debug
-          make -j$(nproc)
-          make install
-
       - name: Build FFmpeg static with x264 x265 (Windows)
-        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig
@@ -150,15 +161,7 @@ jobs:
           make -j$(nproc)
           make install
 
-      # === ZIP & ARTIFACT ===
-      - name: Archive FFmpeg binaries (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          cd ffmpeg_bin
-          7z a ../ffmpeg-linux-x64.zip ffmpeg ffprobe
-
       - name: Copy binaries to artifacts (Windows)
-        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           mkdir -p artifacts
@@ -166,40 +169,17 @@ jobs:
           cp /mingw64/bin/ffprobe.exe artifacts/
 
       - name: Archive FFmpeg binaries (Windows)
-        if: runner.os == 'Windows'
         run: |
           cd artifacts
           7z a ..\ffmpeg-windows-x64.zip ffmpeg.exe ffprobe.exe
 
-      - name: Upload build as artifact (Linux)
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-linux-x64
-          path: ffmpeg-linux-x64.zip
-
       - name: Upload build as artifact (Windows)
-        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-windows-x64
           path: ffmpeg-windows-x64.zip
 
-      # === SINGLE RELEASE UNTUK SEMUA ASSET ===
-      - name: Upload binaries to single Nightly release (Linux)
-        if: runner.os == 'Linux'
-        uses: ncipollo/release-action@v1
-        with:
-          tag: nightly
-          name: Nightly
-          body: |
-            Automated static build (Windows & Linux, x264+x265) from workflow_dispatch.
-          allowUpdates: true
-          prerelease: false
-          artifacts: ffmpeg-linux-x64.zip
-
       - name: Upload binaries to single Nightly release (Windows)
-        if: runner.os == 'Windows'
         uses: ncipollo/release-action@v1
         with:
           tag: nightly
