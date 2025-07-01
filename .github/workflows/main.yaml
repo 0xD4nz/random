@@ -19,19 +19,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            git \
-            pkg-config \
-            nasm \
-            cmake \
-            libtool \
-            wget \
-            yasm \
-            p7zip-full \
-            libnuma-dev \
-            autoconf \
-            automake \
-            libssl-dev
+            build-essential git pkg-config nasm cmake libtool wget yasm p7zip-full libnuma-dev autoconf automake libssl-dev
 
       - name: Install MSYS2 and base tools (Windows)
         if: runner.os == 'Windows'
@@ -178,6 +166,7 @@ jobs:
           name: ffmpeg-windows-x64
           path: ffmpeg-windows-x64.zip
 
+      # === SINGLE RELEASE UNTUK SEMUA ASSET ===
       - name: Upload binaries to single Nightly release (Linux)
         if: runner.os == 'Linux'
         uses: ncipollo/release-action@v1
@@ -185,7 +174,7 @@ jobs:
           tag: nightly
           name: Nightly
           body: |
-            Automated static build (Windows & Linux, x264+x265) from latest push to main branch.
+            Automated static build (Windows & Linux, x264+x265) from latest push.
           allowUpdates: true
           prerelease: false
           artifacts: ffmpeg-linux-x64.zip
@@ -197,7 +186,7 @@ jobs:
           tag: nightly
           name: Nightly
           body: |
-            Automated static build (Windows & Linux, x264+x265) from latest push to main branch.
+            Automated static build (Windows & Linux, x264+x265) from latest push.
           allowUpdates: true
           prerelease: false
           artifacts: ffmpeg-windows-x64.zip
