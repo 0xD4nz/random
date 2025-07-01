@@ -213,5 +213,5 @@ jobs:
           name: Nightly Main
           body: "Automated static build (Windows, x264+x265) from latest push to main branch."
           allowUpdates: true
-          prerelease: true
+          prerelease: false
           artifacts: ffmpeg-windows-x64.zip
