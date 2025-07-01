@@ -1,0 +1,217 @@
+name: Build & Release FFmpeg Multi-Platform (Static x264 + x265)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Target platform to build"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - windows
+          - linux
+
+permissions:
+  contents: write
+
+jobs:
+  build-ffmpeg:
+    # Jalankan di Windows, Linux, atau dua-duanya (matrix)
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+      # Untuk workflow_dispatch, filter matrix jika user pilih platform tertentu
+      # Job ini akan jalan di dua OS saat push, atau satu OS kalau dispatch pilih salah satu
+      # Step di bawah filter matrix dengan if
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Set platform name
+        id: platform
+        run: |
+          echo "PLATFORM=${{ runner.os == 'Windows' && 'windows' || 'linux' }}" >> $GITHUB_ENV
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            pkg-config \
+            nasm \
+            cmake \
+            libtool \
+            wget \
+            yasm \
+            p7zip-full \
+            libnuma-dev \
+            autoconf \
+            automake \
+            libssl-dev
+
+      - name: Install MSYS2 and base tools (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            git
+            make
+            nasm
+            mingw-w64-x86_64-pkg-config
+            unzip
+            wget
+            p7zip
+
+      - name: Checkout FFmpeg source
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          path: ffmpeg
+
+      # === BUILD x264 ===
+      - name: Build x264 static (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git
+          cd x264
+          ./configure --prefix="$GITHUB_WORKSPACE/ffmpeg_build" --enable-static --disable-opencl --disable-cli
+          make -j$(nproc)
+          make install
+
+      - name: Build x264 static (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git
+          cd x264
+          ./configure --prefix=/mingw64 --host=x86_64-w64-mingw32 --enable-static --disable-opencl --disable-cli
+          make -j$(nproc)
+          make install
+
+      # === BUILD x265 ===
+      - name: Build x265 static (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone https://github.com/videolan/x265.git
+          cd x265/build/linux
+          cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/ffmpeg_build" -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../source
+          make -j$(nproc)
+          make install
+
+      - name: Build x265 static (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-windows-x86_64.zip
+          unzip cmake-3.28.3-windows-x86_64.zip -d /tmp/cmake3
+          export PATH="/tmp/cmake3/cmake-3.28.3-windows-x86_64/bin:$PATH"
+          git clone https://github.com/videolan/x265.git
+          cd x265
+          rm -rf build
+          mkdir build
+          cd build
+          cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=/mingw64 -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../source
+          make -j$(nproc)
+          make install
+
+      # === BUILD FFmpeg ===
+      - name: Build FFmpeg static with x264 x265 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/ffmpeg_build/lib/pkgconfig"
+          cd ffmpeg
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/ffmpeg_build" \
+            --pkg-config="pkg-config --static" \
+            --extra-cflags="-I$GITHUB_WORKSPACE/ffmpeg_build/include" \
+            --extra-ldflags="-L$GITHUB_WORKSPACE/ffmpeg_build/lib" \
+            --extra-libs="-lpthread -lm" \
+            --bindir="$GITHUB_WORKSPACE/ffmpeg_bin" \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-static \
+            --disable-shared \
+            --disable-debug
+          make -j$(nproc)
+          make install
+
+      - name: Build FFmpeg static with x264 x265 (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig
+          cd ffmpeg
+          ./configure \
+            --prefix=/mingw64 \
+            --pkg-config="pkg-config --static" \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-static \
+            --disable-shared \
+            --disable-debug \
+            --extra-cflags="-I/mingw64/include" \
+            --extra-ldflags="-L/mingw64/lib"
+          make -j$(nproc)
+          make install
+
+      # === ZIP & ARTIFACT ===
+      - name: Archive FFmpeg binaries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd ffmpeg_bin
+          7z a ../ffmpeg-linux-x64.zip ffmpeg ffprobe
+
+      - name: Copy and Archive FFmpeg binaries (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir artifacts
+          copy mingw64\bin\ffmpeg.exe artifacts\
+          copy mingw64\bin\ffprobe.exe artifacts\
+          cd artifacts
+          7z a ..\ffmpeg-windows-x64.zip ffmpeg.exe ffprobe.exe
+
+      - name: Upload build as artifact (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-x64
+          path: ffmpeg-linux-x64.zip
+
+      - name: Upload build as artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-x64
+          path: ffmpeg-windows-x64.zip
+
+      - name: Create/Update Release and Upload FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: nightly-linux
+          name: Nightly Linux
+          body: "Automated static build (Linux, x264+x265) from latest push to main branch."
+          allowUpdates: true
+          prerelease: true
+          artifacts: ffmpeg-linux-x64.zip
+
+      - name: Create/Update Release and Upload FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: nightly-main
+          name: Nightly Main
+          body: "Automated static build (Windows, x264+x265) from latest push to main branch."
+          allowUpdates: true
+          prerelease: true
+          artifacts: ffmpeg-windows-x64.zip
