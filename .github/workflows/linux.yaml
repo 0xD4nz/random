@@ -1,0 +1,98 @@
+name: Build & Release FFmpeg Linux (Static x264 + x265)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ffmpeg-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            pkg-config \
+            nasm \
+            cmake \
+            libtool \
+            wget \
+            yasm \
+            p7zip-full \
+            libnuma-dev \
+            autoconf \
+            automake \
+            libssl-dev
+
+      - name: Checkout FFmpeg source
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          path: ffmpeg
+
+      - name: Build x264 static
+        run: |
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git
+          cd x264
+          ./configure --prefix="$GITHUB_WORKSPACE/ffmpeg_build" --enable-static --disable-opencl --disable-cli
+          make -j$(nproc)
+          make install
+
+      - name: Build x265 static
+        run: |
+          git clone https://github.com/videolan/x265.git
+          cd x265/build/linux
+          cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/ffmpeg_build" -DENABLE_SHARED=OFF -DENABLE_CLI=OFF ../../source
+          make -j$(nproc)
+          make install
+
+      - name: Build FFmpeg static with x264 x265
+        run: |
+          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/ffmpeg_build/lib/pkgconfig"
+          cd ffmpeg
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/ffmpeg_build" \
+            --pkg-config="pkg-config --static" \
+            --extra-cflags="-I$GITHUB_WORKSPACE/ffmpeg_build/include" \
+            --extra-ldflags="-L$GITHUB_WORKSPACE/ffmpeg_build/lib" \
+            --extra-libs="-lpthread -lm" \
+            --bindir="$GITHUB_WORKSPACE/ffmpeg_bin" \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-static \
+            --disable-shared \
+            --disable-debug
+          make -j$(nproc)
+          make install
+
+      - name: Archive FFmpeg binaries (flat)
+        run: |
+          cd ffmpeg_bin
+          7z a ../ffmpeg-linux-x64.zip ffmpeg ffprobe
+
+      - name: List zip file
+        run: ls -lh ffmpeg-linux-x64.zip
+
+      - name: Upload build as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-x64
+          path: ffmpeg-linux-x64.zip
+
+      - name: Create/Update Release and Upload FFmpeg
+        uses: ncipollo/release-action@v1
+        with:
+          tag: nightly-linux
+          name: Nightly Linux
+          body: "Automated static build (Linux, x264+x265) from latest push to main branch."
+          allowUpdates: true
+          prerelease: true
+          artifacts: ffmpeg-linux-x64.zip
