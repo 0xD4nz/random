@@ -2,16 +2,6 @@ name: Build & Release FFmpeg Multi-Platform (Static x264 + x265)
 
 on:
   workflow_dispatch:
-    inputs:
-      platform:
-        description: "Target platform to build"
-        required: false
-        default: "all"
-        type: choice
-        options:
-          - all
-          - windows
-          - linux
 
 permissions:
   contents: write
@@ -24,11 +14,6 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Set platform name
-        id: platform
-        run: |
-          echo "PLATFORM=${{ runner.os == 'Windows' && 'windows' || 'linux' }}" >> $GITHUB_ENV
-
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -173,10 +158,6 @@ jobs:
           cp /mingw64/bin/ffmpeg.exe artifacts/
           cp /mingw64/bin/ffprobe.exe artifacts/
 
-      - name: List artifacts (Windows)
-        if: runner.os == 'Windows'
-        run: dir artifacts
-
       - name: Archive FFmpeg binaries (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -197,24 +178,26 @@ jobs:
           name: ffmpeg-windows-x64
           path: ffmpeg-windows-x64.zip
 
-      - name: Create/Update Release and Upload FFmpeg (Linux)
+      - name: Upload binaries to single Nightly release (Linux)
         if: runner.os == 'Linux'
         uses: ncipollo/release-action@v1
         with:
-          tag: nightly-linux
-          name: Nightly Linux
-          body: "Automated static build (Linux, x264+x265) from latest push to main branch."
+          tag: nightly
+          name: Nightly
+          body: |
+            Automated static build (Windows & Linux, x264+x265) from latest push to main branch.
           allowUpdates: true
-          prerelease: true
+          prerelease: false
           artifacts: ffmpeg-linux-x64.zip
 
-      - name: Create/Update Release and Upload FFmpeg (Windows)
+      - name: Upload binaries to single Nightly release (Windows)
         if: runner.os == 'Windows'
         uses: ncipollo/release-action@v1
         with:
-          tag: nightly-main
-          name: Nightly Main
-          body: "Automated static build (Windows, x264+x265) from latest push to main branch."
+          tag: nightly
+          name: Nightly
+          body: |
+            Automated static build (Windows & Linux, x264+x265) from latest push to main branch.
           allowUpdates: true
           prerelease: false
           artifacts: ffmpeg-windows-x64.zip
